@@ -27,7 +27,7 @@ class EKFConsistancyTests
 
 public:
 
-	EKFConsistancyTests(int N, double alpha, int z):
+	EKFConsistancyTests(int N, double alpha, int nz):
   acc(tag::rolling_window::window_size = N)
 	{
     using boost::math::chi_squared;
@@ -37,12 +37,14 @@ public:
     //store input vars
     N = N;
     alpha = alpha;
-    z = z;
+    nz = nz;
 
     //compute appropriate interval for Chi-Squared test
-    chi_squared dist(N);
-    upperQ = quantile(complement(dist, alpha / 2));
-    lowerQ = quantile(dist, alpha / 2);
+    chi_squared dist(N * nz);
+    upperQ = (quantile(complement(dist, alpha / 2)) )/ N;
+    lowerQ = (quantile(dist, alpha / 2) ) / N;
+
+    std::cout << "Interval: ["<< lowerQ << "," << upperQ << "] \n";
 
     //set test counters to zero
     iSqTest, iAutoCorr = 0;
@@ -52,11 +54,11 @@ public:
   double computeInnovSqStat(Eigen::VectorXd &v, Eigen::MatrixXd &S)
   {
     //ensure v and S are of appropriate size
-    if ((S.rows() == z) && (S.cols() == z) && (v.size() == z))
+    if ((S.rows() == nz) && (S.cols() == nz) && (v.size() == nz))
       return v.transpose() * S.inverse() * v;
     else
     {
-      std::cout << "ERROR: input vec. or matrix of wrong size" << std::endl;
+      std::cout << "ERROR: input vec. or matrix size don't agree with size given in initialization..." << std::endl;
       return -1;
     }
   }
@@ -85,11 +87,39 @@ public:
 
     double innovSqStat = computeInnovSqStat(v,S);
 
-    //add value to accumulator
-    acc(innovSqStat);
-    
-
+    if (innovSqStat >= 0)
+    { 
+      //add most recent innovation squared statistic value to the rolling-average accumulator
+       acc(innovSqStat);
+   
+       double mean = rolling_mean(acc);
+   
+       //check to see if filter is fully initialized
+       if (iSqTest >= N)
+       {
+         innovationSqTestReady = true;
+         if ((mean > lowerQ) && (mean < upperQ))
+         {
+           //test passed, filter appears 
+           return 1;
+         }
+         else
+         {
+           return -1;
+         }
+       }
+   
+       //filter not ready yet, return 0
+       else if
+       {
+         return 0;
+       }
+    }
+    else
+      //error, wrong size vec or matrix
+      return -1;
   }
+
 private:
 
 	//number of samples over which to evaluate the statistic
@@ -100,7 +130,7 @@ private:
 	//tail probability 
 	double alpha;
   //size of innovation vec.
-  int z;
+  int nz;
 
   //Chi-sq bounds
   double upperQ, lowerQ;
@@ -120,11 +150,11 @@ int main()
 
   //number of samples over which we wish to compute the time-
   //average normalized innovation-squared statistic
-  int N = 5;
+  int N = 50;
   // Confidance interval for statistica test (1-alpha)
   double alpha = 0.05;
   // Size of innovation vector
-  int z = 5;
+  int z = 2;
 
   EKFConsistancyTests test(N,alpha,z);
 
@@ -132,8 +162,6 @@ int main()
   v << 1, 1, 1;
   Eigen::MatrixXd S(3,3);
   S = Eigen::MatrixXd::Identity(3,3);
-
-  std::cout << test.performChiSqTest(0.6356) << std::endl;
 
 }
 
