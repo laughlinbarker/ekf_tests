@@ -2,17 +2,17 @@
 This is an implementation of real-time statistical tests found in Chapter 5, Bar-Shalom, 2001, for examining EKF consistancy.
 See page 237 for details.
 
-Laughlin Barker, Nov. 2017, Dynamical Systems and Control Laboratory, JHU
+Laughlin Barker, Nov. 2017, Dynamical Systems and Control Laboratory, Johns Hopkins University
 laughlinbarker@gmail.com
 */
 
 #ifndef EKF_TESTS_
 #define EKF_TESTS_
 
-//Eigen for Linear Algebra
+//For Linear Algebra
 #include <Eigen/Dense>
 
-//for chi-sq distribution, and rolling mean
+//for chi-sq distribution and rolling mean
 #include <boost/math/distributions/chi_squared.hpp>
 #include <boost/accumulators/accumulators.hpp>
 #include <boost/accumulators/statistics/stats.hpp>
@@ -27,17 +27,17 @@ class EKFConsistancyTests
 
 public:
 
-	EKFConsistancyTests(int N, double alpha, int nz):
-  acc(tag::rolling_window::window_size = N)
+	EKFConsistancyTests(int meanWinSize, double alpha, int vecSize):
+  acc(tag::rolling_window::window_size = meanWinSize)
 	{
     using boost::math::chi_squared;
     using boost::math::quantile;
     using boost::math::complement;
 
     //store input vars
-    N = N;
-    alpha = alpha;
-    nz = nz;
+    this->N = meanWinSize;
+    this->alpha = alpha;
+    this->nz = vecSize;
 
     //compute appropriate interval for Chi-Squared test
     chi_squared dist(N * nz);
@@ -47,18 +47,18 @@ public:
     std::cout << "Interval: ["<< lowerQ << "," << upperQ << "] \n";
 
     //set test counters to zero
-    iSqTest, iAutoCorr = 0;
+    this->iSqTest = 0;
+    this->iAutoCorr = 0;
   }
 
   //Compute single innovation squared statistic
   double computeInnovSqStat(Eigen::VectorXd &v, Eigen::MatrixXd &S)
   {
     //ensure v and S are of appropriate size
-    if ((S.rows() == nz) && (S.cols() == nz) && (v.size() == nz))
+    if ((S.rows() == this->nz) && (S.cols() == this->nz) && (v.size() == this->nz))
       return v.transpose() * S.inverse() * v;
     else
     {
-      std::cout << "ERROR: input vec. or matrix size don't agree with size given in initialization..." << std::endl;
       return -1;
     }
   }
@@ -93,14 +93,18 @@ public:
        acc(innovSqStat);
    
        double mean = rolling_mean(acc);
+
+       std::cout << "vector: " << v.transpose() << std::endl;
+
+       std::cout << "mean: " << mean << std::endl;
    
        //check to see if filter is fully initialized
        if (iSqTest >= N)
        {
          innovationSqTestReady = true;
-         if ((mean > lowerQ) && (mean < upperQ))
+         if (chiSqHypothesisTest(mean))
          {
-           //test passed, filter appears 
+           //test passed, filter seems consistant
            return 1;
          }
          else
@@ -110,13 +114,12 @@ public:
        }
    
        //filter not ready yet, return 0
-       else if
+       else
        {
          return 0;
        }
     }
     else
-      //error, wrong size vec or matrix
       return -1;
   }
 
@@ -144,26 +147,4 @@ private:
   accumulator_set<double, stats<tag::rolling_mean> > acc;
 
 };
-
-int main()
-{
-
-  //number of samples over which we wish to compute the time-
-  //average normalized innovation-squared statistic
-  int N = 50;
-  // Confidance interval for statistica test (1-alpha)
-  double alpha = 0.05;
-  // Size of innovation vector
-  int z = 2;
-
-  EKFConsistancyTests test(N,alpha,z);
-
-  Eigen::VectorXd v(3);
-  v << 1, 1, 1;
-  Eigen::MatrixXd S(3,3);
-  S = Eigen::MatrixXd::Identity(3,3);
-
-}
-
-
 #endif
