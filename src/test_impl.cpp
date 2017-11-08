@@ -42,8 +42,6 @@ int main()
 
   	result = test.checkInnovationStatistic(v,S);
 
-  	std::cout << "Iteration: " << i << std::endl;
-
   	if (result == 0)
   		std::cout << "Filter not initialized" << std::endl;
   	else if (result  == 1)

@@ -27,7 +27,7 @@ class EKFConsistancyTests
 
 public:
 
-	EKFConsistancyTests(int meanWinSize, double alpha, int vecSize):
+	EKFConsistancyTests(int meanWinSize, double tailRegion, int vecSize):
   acc(tag::rolling_window::window_size = meanWinSize)
 	{
     using boost::math::chi_squared;
@@ -35,27 +35,25 @@ public:
     using boost::math::complement;
 
     //store input vars
-    this->N = meanWinSize;
-    this->alpha = alpha;
-    this->nz = vecSize;
+    N = meanWinSize;
+    alpha = tailRegion;
+    nz = vecSize;
 
     //compute appropriate interval for Chi-Squared test
     chi_squared dist(N * nz);
-    upperQ = (quantile(complement(dist, alpha / 2)) )/ N;
+    upperQ = (quantile(complement(dist, >alpha / 2)) )/ N;
     lowerQ = (quantile(dist, alpha / 2) ) / N;
 
-    std::cout << "Interval: ["<< lowerQ << "," << upperQ << "] \n";
-
     //set test counters to zero
-    this->iSqTest = 0;
-    this->iAutoCorr = 0;
+    iSqTest = 0;
+    iAutoCorr = 0;
   }
 
   //Compute single innovation squared statistic
   double computeInnovSqStat(Eigen::VectorXd &v, Eigen::MatrixXd &S)
   {
     //ensure v and S are of appropriate size
-    if ((S.rows() == this->nz) && (S.cols() == this->nz) && (v.size() == this->nz))
+    if ((S.rows() == nz) && (S.cols() == nz) && (v.size() == nz))
       return v.transpose() * S.inverse() * v;
     else
     {
